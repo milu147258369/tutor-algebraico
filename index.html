@@ -1,169 +1,517 @@
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tutor Algebraico Adaptativo v5.0 | Analítica Pedagógica</title>
+<title>Tutor Algebraico v5.4 | 1000 Ejercicios y Taxonomía</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 <style>
-:root { --primary: #4f46e5; --bg: #f8fafc; }
-body { font-family: 'Outfit', sans-serif; background-color: var(--bg); color: #1e293b; }
-.glass { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
-.feedback-top { margin-top: 20px; }
+  :root { --primary: #4f46e5; --bg: #f8fafc; }
+  body { font-family: system-ui, -apple-system, sans-serif; background-color: var(--bg); color: #1e293b; }
+  .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); }
+  
+  .math-viewer .katex {
+    color: #ffffff !important;
+    font-size: 1.5rem !important;
+  }
+  .math-viewer .katex .mord, 
+  .math-viewer .katex .mord.mathnormal,
+  .math-viewer .katex .mathbf,
+  .math-viewer .katex .mathrm {
+    color: #ffffff !important;
+  }
 </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800">
 <div id="root"></div>
 <script type="text/babel">
 
 const { useState, useEffect, useRef } = React;
 
-// --- TAXONOMÍA DE ERRORES ---
 const ERROR_TAXONOMY = {
-"E1a": "Error de Jerarquía",
-"E1b": "Error de Agrupación",
-"E2a": "Error de Signos",
-"E2b": "Error de Exponentes/Radicales",
-"E2c": "Error de Coeficiente",
-"E3a": "Error de Sintaxis",
-"E3b": "Error Lógico",
-"E4a": "Error de Estilo",
-"E4b": "Error de Comprensión"
+  "E0": { name: "Sin Error", desc: "Traducción algebraica matemáticamente correcta y validada." },
+  "E1a": { name: "Error de Agrupación Estructural", desc: "Omisión de paréntesis que altera la precedencia de sumas o restas frente a productos." },
+  "E1b": { name: "Error de Inversión (Reversal)", desc: "Traducción proporcional literal de izquierda a derecha invirtiendo la relación real (ej. 6S=P)." },
+  "E2a": { name: "Error de Signos y Polaridad", desc: "Confusión conceptual entre operadores de adición y sustracción o inversión de términos en restas." },
+  "E2b": { name: "Sesgo de Linealidad (No-Linealidades)", desc: "Asumir distributividad errónea en radicales o potencias (ej. raíz de una suma separada)." },
+  "E2c": { name: "Confusión Letra-Etiqueta", desc: "Tratar literales como abreviaturas de unidades físicas en lugar de magnitudes abstractas." },
+  "E3a": { name: "Error de Sintaxis y Balance", desc: "Paréntesis desbalanceados o caracteres tipográficos inválidos en la expresión." },
+  "E3b": { name: "Error Lógico de Traducción Semántica", desc: "Interpretación general errónea del enunciado verbal al pasar al lenguaje algebraico." }
 };
 
-// --- NORMALIZADOR ---
-const normalizeExpression = (str) => {
-return str.replace(/\s/g, '')
-.replace(/√\(/g, 'sqrt(')
-.replace(/√(\w)/g, 'sqrt($1)')
-.replace(/sqrt\((.*?)\)/g, 'sqrt($1)')
-.replace(/\^(\d+)/g, '^$1')
-.replace(/²/g, '^2').replace(/³/g, '^3');
+const PEDAGOGICAL_GUIDES = {
+  "E1a": ["Utiliza paréntesis obligatorios para agrupar bloques operativos completos antes de multiplicar o dividir."],
+  "E1b": ["Analiza qué cantidad es mayor o quién depende de quién antes de plantear la ecuación o proporción."],
+  "E2a": ["Verifica minuciosamente palabras clave como 'disminuido', 'diferencia' (-) frente a 'aumentado' (+)."],
+  "E2b": ["Recuerda que la raíz de una suma no es igual a la suma de las raíces independientes."],
+  "E2c": ["Las variables algebraicas representan valores numéricos abstractos, no unidades físicas de medida."],
+  "E3a": ["Revisa rigurosamente que cada paréntesis abierto posea su respectivo cierre."],
+  "E3b": ["Desglosa el enunciado frase por frase para estructurar la lógica relacional correcta."]
 };
 
-// --- BANCO DE EJERCICIOS (1000) ---
 const ExerciseBank = (() => {
   const levels = ["Básico", "Intermedio", "Avanzado"];
   const vars = ["x", "y", "a", "b", "n", "m"];
-  const opsBasic = [
-    { w: "el doble de", c: "2*", prefix: "2*(" },
-    { w: "el triple de", c: "3*", prefix: "3*(" },
-    { w: "la mitad de", c: "/2", prefix: "(" }
-  ];
   const bank = [];
-
+  // Generación de 1000 ejercicios distribuidos equitativamente
   for (let i = 1; i <= 1000; i++) {
     const lvlIdx = i <= 333 ? 0 : i <= 666 ? 1 : 2;
     const v = vars[i % vars.length];
-    const k = (i % 10) + 1;
-
-    let item = { id: `P${String(i).padStart(3,'0')}`, level: levels[lvlIdx], statement: "", answer: "" };
-
+    const k = (i % 15) + 1;
+    let item = { id: `P${String(i).padStart(4,'0')}`, level: levels[lvlIdx], statement: "", answer: "" };
     if (lvlIdx === 0) {
-      const op = opsBasic[i % opsBasic.length];
-      item.statement = `${op.w} la suma de ${v} y ${k}.`;
-      item.answer = op.c === "/2" ? `(${v}+${k})/2` : `${op.c}(${v}+${k})`;
+      item.statement = `El doble de la suma de ${v} y ${k}.`;
+      item.answer = `2*(${v}+${k})`;
     } else if (lvlIdx === 1) {
-      item.statement = `El cociente entre el cuadrado de ${v} y la raíz de ${k}.`;
-      item.answer = `${v}^2/sqrt(${k})`;
+      item.statement = `La raíz cuadrada de la suma de ${v} y ${k}.`;
+      item.answer = `sqrt(${v}+${k})`;
     } else {
-      item.statement = `La raíz de la diferencia entre el cubo de ${v} y ${k}, disminuida en 5.`;
-      item.answer = `sqrt(${v}^3-${k})-5`;
+      item.statement = `Por cada 5 estudiantes hay ${k} profesores en el aula. (Plantear equivalencia)`;
+      item.answer = `${k}*x/5`;
     }
-
     bank.push(item);
   }
   return bank;
 })();
 
-// --- COMPONENTE PRINCIPAL ---
+const MathNode = ({ formula }) => {
+  const ref = useRef();
+  useEffect(() => {
+    if (ref.current && formula) {
+      let formatted = formula
+        .replace(/sqrt\((.*?)\)/g, '\\sqrt{$1}')
+        .replace(/([a-zA-Z0-9]+)\^(\d+)/g, '$1^{$2}')
+        .replace(/\*/g, ' \\cdot ');
+      try {
+        katex.render(formatted, ref.current, { displayMode: true, throwOnError: false });
+      } catch (e) {
+        ref.current.textContent = formula;
+      }
+    } else if (ref.current) {
+      ref.current.textContent = "Escribe una expresión...";
+    }
+  }, [formula]);
+  return <div ref={ref} className="math-viewer font-bold min-h-[50px] flex items-center justify-center"></div>;
+};
+
 function App() {
-const [input, setInput] = useState('');
-const [feedback, setFeedback] = useState(null);
-const [logs, setLogs] = useState([]);
-const [view, setView] = useState('student');
-const [exercise, setExercise] = useState(ExerciseBank[0]);
-const inputRef = useRef(null);
+  const [authView, setAuthView] = useState("login");
+  const [userRole, setUserRole] = useState(null);
+  const [studentCode, setStudentCode] = useState("");
+  const [teacherPassInput, setTeacherPassInput] = useState("");
+  
+  const TEACHER_SECRET_KEY = "admin-algebra-2026-secure";
 
-const evaluate = () => {
-const cleanInput = normalizeExpression(input);
-const cleanAnswer = normalizeExpression(exercise.answer);
-const isCorrect = cleanInput === cleanAnswer;
-let errorType = "E0";
+  const [view, setView] = useState("student");
+  const [level, setLevel] = useState("Básico");
+  const [index, setIndex] = useState(0);
+  const [input, setInput] = useState("");
+  const [feedback, setFeedback] = useState(null);
+  const [logs, setLogs] = useState([]);
 
-if (!isCorrect) {
-if (cleanInput.includes('sqrt')) errorType = "E2b";
-else if (cleanInput.includes('+') && !cleanInput.includes('/')) errorType = "E2a";
-else if ((cleanInput.match(/\(/g) || []).length !== (cleanAnswer.match(/\(/g) || []).length) errorType = "E3a";
-else errorType = "E3b";
+  const exercises = React.useMemo(() => ExerciseBank.filter(e => e.level === level), [level]);
+  const current = exercises[index % exercises.length];
+  const inputRef = useRef(null);
+
+  const handleStudentLogin = (e) => {
+    e.preventDefault();
+    if (!studentCode.trim()) return alert("Por favor ingresa un código de estudiante válido.");
+    setUserRole("student");
+    setView("student");
+    setAuthView("app");
+  };
+
+  const handleTeacherLogin = (e) => {
+    e.preventDefault();
+    if (teacherPassInput === TEACHER_SECRET_KEY) {
+      setUserRole("teacher");
+      setView("teacher");
+      setAuthView("app");
+    } else {
+      alert("Credencial docente no válida.");
+    }
+  };
+
+  const insertSymbol = (sym) => {
+    const el = inputRef.current;
+    if (!el) { setInput(prev => prev + sym); return; }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const newVal = input.substring(0, start) + sym + input.substring(end);
+    setInput(newVal);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(start + sym.length, start + sym.length);
+    }, 0);
+  };
+
+  const evaluate = () => {
+    const cleanInput = input.replace(/\s/g, "");
+    const cleanAnswer = current.answer.replace(/\s/g, "");
+    const isCorrect = cleanInput === cleanAnswer;
+    
+    let errorType = "E0";
+    if (!isCorrect) {
+      const openCount = (cleanInput.match(/\(/g) || []).length;
+      const closeCount = (cleanInput.match(/\)/g) || []).length;
+      
+      if (openCount !== closeCount) {
+        errorType = "E3a";
+      } else if (current.statement.includes("suma") && !cleanInput.includes("(") && current.answer.includes("(")) {
+        errorType = "E1a";
+      } else if (current.statement.includes("estudiantes") && cleanInput.includes("5*")) {
+        errorType = "E1b";
+      } else if (cleanInput.includes("sqrt") && (cleanInput.includes("+") || cleanInput.includes("-")) && !cleanInput.includes("sqrt(")) {
+        errorType = "E2b";
+      } else if (cleanInput.includes("m") || cleanInput.includes("kg") || cleanInput.includes("cm")) {
+        errorType = "E2c";
+      } else if (cleanInput.includes("+") !== cleanAnswer.includes("+") && cleanInput.includes("-") !== cleanAnswer.includes("-")) {
+        errorType = "E2a";
+      } else {
+        errorType = "E3b";
+      }
+    }
+
+    const feedbackObj = isCorrect ? {
+      type: "success",
+      msg: "¡Excelente! Traducción algebraica correcta."
+    } : {
+      type: "error",
+      category: errorType,
+      name: ERROR_TAXONOMY[errorType].name,
+      msg: ERROR_TAXONOMY[errorType].desc,
+      steps: PEDAGOGICAL_GUIDES[errorType] || ["Revisa los conceptos teóricos fundamentales de este bloque."]
+    };
+
+    setFeedback(feedbackObj);
+
+    const newLog = {
+      id: current.id,
+      student: studentCode || "Estudiante Anónimo",
+      level,
+      statement: current.statement,
+      input,
+      result: isCorrect ? "Correcto" : "Incorrecto",
+      errorCategory: errorType,
+      errorDesc: ERROR_TAXONOMY[errorType].name
+    };
+    setLogs([newLog, ...logs]);
+  };
+
+  const exportCSV = () => {
+    const headers = "ID,Estudiante,Nivel,Enunciado,Entrada,Resultado,CodigoError,DescripcionError\n";
+    const rows = logs.map(l => `${l.id},"${l.student}",${l.level},"${l.statement}","${l.input}",${l.result},${l.errorCategory},"${l.errorDesc}"`).join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Reporte_Taxonomia_1000_Ejercicios.csv";
+    a.click();
+  };
+
+  if (authView === "login") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="glass p-8 rounded-3xl shadow-2xl max-w-md w-full space-y-6">
+          <div className="text-center">
+            <h1 className="text-2xl font-black text-slate-800">Tutor Algebraico v5.4</h1>
+            <p className="text-sm text-slate-500 mt-1">Banco de 1000 Ejercicios y Taxonomía</p>
+          </div>
+
+          <div className="space-y-4">
+            <form onSubmit={handleStudentLogin} className="space-y-3 p-4 bg-slate-50 rounded-2xl border">
+              <h2 className="font-bold text-slate-700 text-sm">Acceso Estudiante</h2>
+              <input 
+                type="text" 
+                placeholder="Código de alumno (ej. EST-101)" 
+                value={studentCode} 
+                onChange={e => setStudentCode(e.target.value)}
+                className="w-full border p-3 rounded-xl text-sm outline-none focus:border-indigo-500 bg-white"
+              />
+              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow">
+                Iniciar Sesión Alumno
+              </button>
+            </form>
+
+            <form onSubmit={handleTeacherLogin} className="space-y-3 p-4 bg-slate-50 rounded-2xl border">
+              <h2 className="font-bold text-slate-700 text-sm">Acceso Docente Seguro</h2>
+              <input 
+                type="password" 
+                placeholder="Ingrese clave de acceso docente" 
+                value={teacherPassInput} 
+                onChange={e => setTeacherPassInput(e.target.value)}
+                className="w-full border p-3 rounded-xl text-sm outline-none focus:border-emerald-500 bg-white"
+              />
+              <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow">
+                Acceder al Panel de Analítica
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6 max-w-6xl mx-auto">
+      <nav className="flex justify-between items-center mb-8 glass px-6 py-4 rounded-2xl shadow-sm">
+        <div className="flex gap-3">
+          {userRole === "student" && (
+            <button onClick={() => setView("student")} className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${view==="student"?"bg-indigo-600 text-white shadow":"bg-white text-slate-600"}`}>
+              Área de Práctica
+            </button>
+          )}
+          <button onClick={() => {
+            if(userRole === "student") {
+              const pass = prompt("Ingrese credencial docente:");
+              if(pass !== TEACHER_SECRET_KEY) { alert("Credencial incorrecta"); return; }
+            }
+            setView("teacher");
+          }} className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${view==="teacher"?"bg-emerald-600 text-white shadow":"bg-white text-slate-600"}`}>
+            Panel Docente & Taxonomía de Errores
+          </button>
+        </div>
+        <button onClick={() => setAuthView("login")} className="text-xs font-bold text-rose-600 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+          Cerrar Sesión
+        </button>
+      </nav>
+
+      {view === "student" && (
+        <div className="glass p-8 rounded-3xl shadow-xl space-y-6 max-w-2xl mx-auto">
+          <div className="flex justify-between items-center border-b pb-4">
+            <div className="flex gap-2">
+              {["Básico", "Intermedio", "Avanzado"].map(l => (
+                <button key={l} onClick={() => { setLevel(l); setIndex(0); setInput(""); setFeedback(null); }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${level===l?"bg-indigo-600 text-white":"bg-slate-100 text-slate-600"}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs font-black text-indigo-500 uppercase tracking-widest">Ej. {current.id} (de 1000)</span>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">"{current.statement}"</h2>
+          </div>
+
+          <div className="space-y-3">
+            <input 
+              ref={inputRef} 
+              value={input} 
+              onChange={e => setInput(e.target.value)} 
+              className="w-full bg-white border-2 border-slate-200 p-4 rounded-2xl text-xl font-mono text-indigo-600 focus:border-indigo-500 outline-none shadow-inner"
+              placeholder="Escribe tu expresión..."
+            />
+
+            <div className="flex flex-wrap gap-2 pt-1 bg-slate-50 p-3 rounded-2xl border">
+              {['x', 'y', 'a', 'b', '+', '-', '*', '/', '^2', '^3', '(', ')', 'sqrt('].map(sym => (
+                <button key={sym} onClick={() => insertSymbol(sym)} className="bg-white hover:bg-indigo-50 hover:text-indigo-600 font-bold px-3 py-1.5 rounded-xl border text-sm shadow-sm transition-all">
+                  {sym}
+                </button>
+              ))}
+              <button onClick={() => setInput("")} className="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-3 py-1.5 rounded-xl border border-rose-200 text-sm ml-auto">
+                Limpiar
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 p-5 rounded-2xl text-center shadow-inner">
+            <span className="text-[10px] text-slate-400 uppercase tracking-widest block mb-2 font-semibold">Visualizador Simbólico (KaTeX)</span>
+            <MathNode formula={input} />
+          </div>
+
+          <button onClick={evaluate} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-2xl shadow-lg transition-all">
+            Evaluar Respuesta
+          </button>
+
+          {feedback && (
+            <div className={`p-5 rounded-2xl border ${feedback.type==="success"?"bg-emerald-50 text-emerald-800 border-emerald-200":"bg-rose-50 text-rose-800 border-rose-200"}`}>
+              <p className="font-bold text-base">{feedback.type === "success" ? feedback.msg : `[${feedback.category}] ${feedback.name}: ${feedback.msg}`}</p>
+              {feedback.steps && (
+                <div className="mt-3 pt-3 border-t border-rose-200/60">
+                  <span className="text-xs font-bold uppercase tracking-wider block mb-1">Guía pedagógica de apoyo:</span>
+                  <ul className="list-disc pl-5 text-sm space-y-1">
+                    {feedback.steps.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-between pt-4 border-t">
+            <button onClick={() => { setIndex(index > 0 ? index - 1 : 0); setInput(""); setFeedback(null); }} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-slate-600 text-sm">Anterior</button>
+            <button onClick={() => { setIndex(index + 1); setInput(""); setFeedback(null); }} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-slate-600 text-sm">Siguiente</button>
+          </div>
+        </div>
+      )}
+
+      {view === "teacher" && (() => {
+        const totalLogs = logs.length;
+        const correctCount = logs.filter(l => l.result === "Correcto").length;
+        const errorLogs = logs.filter(l => l.result === "Incorrecto");
+        const successRate = totalLogs > 0 ? ((correctCount / totalLogs) * 100).toFixed(1) : 0;
+        const errorRate = totalLogs > 0 ? ((errorLogs.length / totalLogs) * 100).toFixed(1) : 0;
+
+        const errorStats = {};
+        Object.keys(ERROR_TAXONOMY).forEach(code => {
+          if(code !== "E0") {
+            errorStats[code] = logs.filter(l => l.errorCategory === code).length;
+          }
+        });
+
+        const basicCount = logs.filter(l => l.level === "Básico").length;
+        const interCount = logs.filter(l => l.level === "Intermedio").length;
+        const advCount = logs.filter(l => l.level === "Avanzado").length;
+
+        return (
+          <div className="glass p-8 rounded-3xl shadow-xl space-y-8">
+            <div className="flex justify-between items-center border-b pb-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-800">Panel Docente & Taxonomía de Errores</h2>
+                <p className="text-sm text-slate-500">Monitorización activa sobre el banco total de 1000 ejercicios</p>
+              </div>
+              <button onClick={exportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl shadow transition-all text-sm">
+                Exportar Reporte CSV
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase">Total Evaluaciones</span>
+                <p className="text-3xl font-black text-indigo-600 mt-1">{totalLogs}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase">Aciertos Registrados</span>
+                <p className="text-3xl font-black text-emerald-600 mt-1">{correctCount}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase">Errores Detectados</span>
+                <p className="text-3xl font-black text-rose-600 mt-1">{errorLogs.length}</p>
+              </div>
+              <div className="bg-white p-5 rounded-2xl border shadow-sm">
+                <span className="text-xs font-bold text-slate-400 uppercase">Tasa de Éxito Global</span>
+                <p className="text-3xl font-black text-indigo-700 mt-1">{successRate}%</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+                <h3 className="font-bold text-slate-800 text-base">Gráfico de Rendimiento Global</h3>
+                <div className="space-y-3 pt-2">
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-emerald-700">Aciertos ({correctCount})</span>
+                      <span className="text-emerald-700">{successRate}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${successRate}%` }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs font-bold mb-1">
+                      <span className="text-rose-700">Errores ({errorLogs.length})</span>
+                      <span className="text-rose-700">{errorRate}%</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-4 rounded-full overflow-hidden">
+                      <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${errorRate}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Actividad por Nivel</h4>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border">
+                      <span className="block text-[10px] text-slate-400 font-bold">BÁSICO</span>
+                      <span className="text-lg font-black text-indigo-600">{basicCount}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border">
+                      <span className="block text-[10px] text-slate-400 font-bold">INTERMEDIO</span>
+                      <span className="text-lg font-black text-indigo-600">{interCount}</span>
+                    </div>
+                    <div className="bg-slate-50 p-2.5 rounded-xl border">
+                      <span className="block text-[10px] text-slate-400 font-bold">AVANZADO</span>
+                      <span className="text-lg font-black text-indigo-600">{advCount}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+                <h3 className="font-bold text-slate-800 text-base">Taxonomía de Errores Didácticos</h3>
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                  {Object.entries(ERROR_TAXONOMY).filter(([code]) => code !== "E0").map(([code, info]) => {
+                    const count = errorStats[code] || 0;
+                    const percentage = errorLogs.length > 0 ? ((count / errorLogs.length) * 100).toFixed(1) : 0;
+                    return (
+                      <div key={code} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-bold text-slate-700">[{code}] {info.name}</span>
+                          <span className="font-bold text-rose-600">{count} ({percentage}%)</span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                          <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${percentage}%` }}></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            <div>
+              <h3 className="font-bold text-slate-700 mb-3">Registro de Interacciones Individuales</h3>
+              <div className="overflow-x-auto max-h-96 border rounded-2xl bg-white shadow-inner">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0">
+                    <tr>
+                      <th className="p-3">ID</th>
+                      <th className="p-3">Estudiante</th>
+                      <th className="p-3">Nivel</th>
+                      <th className="p-3">Entrada Usuario</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3">Clasificación Taxonómica</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {logs.length === 0 ? (
+                      <tr><td colSpan="6" className="p-6 text-center text-slate-400">No hay registros de actividad pedagógica aún.</td></tr>
+                    ) : logs.map((l, i) => (
+                      <tr key={i} className="hover:bg-slate-50">
+                        <td className="p-3 font-bold text-indigo-600">{l.id}</td>
+                        <td className="p-3 font-medium">{l.student}</td>
+                        <td className="p-3">{l.level}</td>
+                        <td className="p-3 font-mono text-xs">{l.input}</td>
+                        <td className="p-3">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${l.result==="Correcto"?"bg-emerald-100 text-emerald-700":"bg-rose-100 text-rose-700"}`}>
+                            {l.result}
+                          </span>
+                        </td>
+                        <td className="p-3 text-xs font-medium text-slate-700">
+                          {l.errorCategory !== "E0" ? <span className="text-rose-600 font-bold">[{l.errorCategory}] </span> : null}
+                          {l.errorDesc}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
 }
 
-setFeedback(isCorrect ? {
-type: 'success',
-msg: "¡Excelente! Tu traducción algebraica es correcta."
-} : {
-type: 'error',
-category: errorType,
-msg: ERROR_TAXONOMY[errorType]
-});
-
-const newLog = { id: exercise.id, statement: exercise.statement, input, result: isCorrect ? 'Correcto' : 'Incorrecto', errorCategory: errorType };
-setLogs([newLog, ...logs]);
-};
-
-useEffect(() => {
-if (view === 'teacher') {
-const ctx = document.getElementById('errorChart').getContext('2d');
-const errorCounts = logs.reduce((acc, l) => {
-if(l.errorCategory!=='E0') acc[l.errorCategory] = (acc[l.errorCategory]||0)+1;
-return acc;
-}, {});
-new Chart(ctx, {
-type: 'pie',
-data: {
-labels: Object.keys(errorCounts),
-datasets: [{
-data: Object.values(errorCounts),
-backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#10b981']
-}]
-}
-});
-}
-}, [view, logs]);
-
-const exportCSV = () => {
-const headers = "ID,Nivel,Enunciado,Respuesta,Entrada,Resultado,Error\n";
-const rows = logs.map(l => `${l.id},${exercise.level},"${l.statement}","${exercise.answer}","${l.input}",${l.result},${l.errorCategory}`).join("\n");
-const blob = new Blob([headers + rows], { type: 'text/csv' });
-const url = URL.createObjectURL(blob);
-const a = document.createElement('a');
-a.href = url;
-a.download = "Banco_Ejercicios_Algebra.csv";
-a.click();
-};
-
-return (
-<div className="min-h-screen p-10">
-<nav className="flex justify-between mb-10">
-<button onClick={()=>setView('student')} className="bg-indigo-600 text-white px-6 py-2 rounded-xl">Vista Estudiante</button>
-<button onClick={()=>setView('teacher')} className="bg-emerald-600 text-white px-6 py-2 rounded-xl">Panel Docente</button>
-</nav>
-
-{view==='student' && (
-<div className="glass p-10 rounded-[2.5rem] shadow-xl max-w-xl mx-auto">
-<span className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.4em] block mb-2">Ejercicio {exercise.id}</span>
-<h2 className="text-xl font-bold mb-4">"{exercise.statement}"</h2>
-<input ref={inputRef} value={input} onChange={(e)=>setInput(e.target.value)}
-className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl text-xl font-mono text-indigo-600 focus:border-indigo-400 outline-none transition-all mb-4"
-placeholder="Traduce a lenguaje algebraico..." />
-<button onClick={evaluate} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl hover:bg-indigo-700 transition-all">Evaluar</button>
-
-{feedback && (
-<div className={`feedback-top p-6 rounded-2xl ${feedback.type==='success'?'bg-green-100 text-green-700':'bg-rose-50 border border-rose-200 text-rose-700'}`}>
-{feedback.type==='success' ? (
-<p className="font-bold text-lg">{
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
