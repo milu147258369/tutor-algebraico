@@ -2,7 +2,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tutor Algebraico Adaptativo v4.1 | Analítica Pedagógica</title>
+<title>Tutor Algebraico Adaptativo v5.0 | Analítica Pedagógica</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -14,7 +14,7 @@
 :root { --primary: #4f46e5; --bg: #f8fafc; }
 body { font-family: 'Outfit', sans-serif; background-color: var(--bg); color: #1e293b; }
 .glass { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
-.feedback-top { position: relative; top: -20px; margin-bottom: 20px; }
+.feedback-top { margin-top: 20px; }
 </style>
 </head>
 <body>
@@ -46,37 +46,73 @@ return str.replace(/\s/g, '')
 .replace(/²/g, '^2').replace(/³/g, '^3');
 };
 
+// --- BANCO DE EJERCICIOS (1000) ---
+const ExerciseBank = (() => {
+  const levels = ["Básico", "Intermedio", "Avanzado"];
+  const vars = ["x", "y", "a", "b", "n", "m"];
+  const opsBasic = [
+    { w: "el doble de", c: "2*", prefix: "2*(" },
+    { w: "el triple de", c: "3*", prefix: "3*(" },
+    { w: "la mitad de", c: "/2", prefix: "(" }
+  ];
+  const bank = [];
+
+  for (let i = 1; i <= 1000; i++) {
+    const lvlIdx = i <= 333 ? 0 : i <= 666 ? 1 : 2;
+    const v = vars[i % vars.length];
+    const k = (i % 10) + 1;
+
+    let item = { id: `P${String(i).padStart(3,'0')}`, level: levels[lvlIdx], statement: "", answer: "" };
+
+    if (lvlIdx === 0) {
+      const op = opsBasic[i % opsBasic.length];
+      item.statement = `${op.w} la suma de ${v} y ${k}.`;
+      item.answer = op.c === "/2" ? `(${v}+${k})/2` : `${op.c}(${v}+${k})`;
+    } else if (lvlIdx === 1) {
+      item.statement = `El cociente entre el cuadrado de ${v} y la raíz de ${k}.`;
+      item.answer = `${v}^2/sqrt(${k})`;
+    } else {
+      item.statement = `La raíz de la diferencia entre el cubo de ${v} y ${k}, disminuida en 5.`;
+      item.answer = `sqrt(${v}^3-${k})-5`;
+    }
+
+    bank.push(item);
+  }
+  return bank;
+})();
+
 // --- COMPONENTE PRINCIPAL ---
 function App() {
 const [input, setInput] = useState('');
 const [feedback, setFeedback] = useState(null);
 const [logs, setLogs] = useState([]);
 const [view, setView] = useState('student');
+const [exercise, setExercise] = useState(ExerciseBank[0]);
 const inputRef = useRef(null);
 
 const evaluate = () => {
 const cleanInput = normalizeExpression(input);
-const correctAnswer = normalizeExpression('(x+5)/2');
-const isCorrect = cleanInput === correctAnswer;
+const cleanAnswer = normalizeExpression(exercise.answer);
+const isCorrect = cleanInput === cleanAnswer;
 let errorType = "E0";
 
 if (!isCorrect) {
 if (cleanInput.includes('sqrt')) errorType = "E2b";
 else if (cleanInput.includes('+') && !cleanInput.includes('/')) errorType = "E2a";
-else if ((cleanInput.match(/\(/g) || []).length !== (correctAnswer.match(/\(/g) || []).length) errorType = "E3a";
+else if ((cleanInput.match(/\(/g) || []).length !== (cleanAnswer.match(/\(/g) || []).length) errorType = "E3a";
 else errorType = "E3b";
 }
 
 setFeedback(isCorrect ? {
 type: 'success',
-msg: "¡Excelente! Tu expresión algebraica es correcta."
+msg: "¡Excelente! Tu traducción algebraica es correcta."
 } : {
 type: 'error',
 category: errorType,
 msg: ERROR_TAXONOMY[errorType]
 });
 
-const newLog = { input, result: isCorrect ? 'Correcto' : 'Incorrecto', errorCategory: errorType };
+const newLog = { id: exercise.id, statement: exercise.statement, input, result: isCorrect ? 'Correcto' : 'Incorrecto', errorCategory: errorType };
 setLogs([newLog, ...logs]);
 };
 
@@ -100,6 +136,17 @@ backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#10b981']
 }
 }, [view, logs]);
 
+const exportCSV = () => {
+const headers = "ID,Nivel,Enunciado,Respuesta,Entrada,Resultado,Error\n";
+const rows = logs.map(l => `${l.id},${exercise.level},"${l.statement}","${exercise.answer}","${l.input}",${l.result},${l.errorCategory}`).join("\n");
+const blob = new Blob([headers + rows], { type: 'text/csv' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = "Banco_Ejercicios_Algebra.csv";
+a.click();
+};
+
 return (
 <div className="min-h-screen p-10">
 <nav className="flex justify-between mb-10">
@@ -109,46 +156,14 @@ return (
 
 {view==='student' && (
 <div className="glass p-10 rounded-[2.5rem] shadow-xl max-w-xl mx-auto">
-<label className="block text-slate-700 font-bold mb-4">Ejercicio: (x + 5) / 2</label>
+<span className="text-[11px] font-black text-indigo-500 uppercase tracking-[0.4em] block mb-2">Ejercicio {exercise.id}</span>
+<h2 className="text-xl font-bold mb-4">"{exercise.statement}"</h2>
 <input ref={inputRef} value={input} onChange={(e)=>setInput(e.target.value)}
 className="w-full bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl text-xl font-mono text-indigo-600 focus:border-indigo-400 outline-none transition-all mb-4"
-placeholder="Escribe tu expresión algebraica..." />
+placeholder="Traduce a lenguaje algebraico..." />
 <button onClick={evaluate} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-2xl hover:bg-indigo-700 transition-all">Evaluar</button>
 
 {feedback && (
-<div className={`feedback-top mt-6 p-6 rounded-2xl ${feedback.type==='success'?'bg-green-100 text-green-700':'bg-rose-50 border border-rose-200 text-rose-700'}`}>
+<div className={`feedback-top p-6 rounded-2xl ${feedback.type==='success'?'bg-green-100 text-green-700':'bg-rose-50 border border-rose-200 text-rose-700'}`}>
 {feedback.type==='success' ? (
-<p className="font-bold text-lg">{feedback.msg}</p>
-) : (
-<p className="font-bold">{feedback.category}: {feedback.msg}</p>
-)}
-</div>
-)}
-</div>
-)}
-
-{view==='teacher' && (
-<div id="teacher-panel" className="glass p-10 rounded-[2.5rem] shadow-xl">
-<h2 className="text-3xl font-black text-slate-800 mb-6">Panel de Analítica Docente</h2>
-<div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-<div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-<h3 className="font-black text-slate-800 mb-4 uppercase text-sm border-b pb-2 tracking-widest">Distribución de Errores</h3>
-<canvas id="errorChart" height="200"></canvas>
-</div>
-<div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-<h3 className="font-black text-slate-800 mb-4 uppercase text-sm border-b pb-2 tracking-widest">Últimos Errores</h3>
-<ul className="space-y-2 text-sm text-slate-700">
-{logs.map((l,i)=><li key={i}>• {l.errorCategory}: {l.input}</li>)}
-</ul>
-</div>
-</div>
-</div>
-)}
-</div>
-);
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
-</script>
-</body>
-</html>
+<p className="font-bold text-lg">{
