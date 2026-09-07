@@ -58,7 +58,6 @@ const ExerciseBank = (() => {
   const levels = ["Básico", "Intermedio", "Avanzado"];
   const vars = ["x", "y", "a", "b", "n", "m"];
   const bank = [];
-  // Generación de 1000 ejercicios distribuidos equitativamente
   for (let i = 1; i <= 1000; i++) {
     const lvlIdx = i <= 333 ? 0 : i <= 666 ? 1 : 2;
     const v = vars[i % vars.length];
@@ -112,7 +111,25 @@ function App() {
   const [index, setIndex] = useState(0);
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState(null);
-  const [logs, setLogs] = useState([]);
+  
+  // Inicialización de logs persistentes con localStorage
+  const [logs, setLogs] = useState(() => {
+    try {
+      const savedLogs = localStorage.getItem("tutor_algebraico_logs");
+      return savedLogs ? JSON.parse(savedLogs) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Guardar logs automáticamente en localStorage cada vez que cambien
+  useEffect(() => {
+    try {
+      localStorage.setItem("tutor_algebraico_logs", JSON.stringify(logs));
+    } catch (e) {
+      console.error("Error al guardar en localStorage", e);
+    }
+  }, [logs]);
 
   const exercises = React.useMemo(() => ExerciseBank.filter(e => e.level === level), [level]);
   const current = exercises[index % exercises.length];
@@ -375,9 +392,14 @@ function App() {
                 <h2 className="text-2xl font-black text-slate-800">Panel Docente & Taxonomía de Errores</h2>
                 <p className="text-sm text-slate-500">Monitorización activa sobre el banco total de 1000 ejercicios</p>
               </div>
-              <button onClick={exportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl shadow transition-all text-sm">
-                Exportar Reporte CSV
-              </button>
+              <div className="flex gap-2">
+                <button onClick={() => { if(confirm("¿Estás seguro de limpiar todos los registros guardados?")) { setLogs([]); localStorage.removeItem("tutor_algebraico_logs"); } }} className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-bold px-4 py-2.5 rounded-xl shadow-sm transition-all text-sm">
+                  Limpiar Reportes
+                </button>
+                <button onClick={exportCSV} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl shadow transition-all text-sm">
+                  Exportar Reporte CSV
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
