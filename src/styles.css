@@ -1,0 +1,6 @@
+/* Basic styles and minimal Tailwind-like utility replacements for demo */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;500&display=swap');
+:root { --primary: #4f46e5; --bg: #f8fafc; }
+body { font-family: 'Outfit', sans-serif; background: var(--bg); color: #0f172a; margin: 0; }
+.glass { background: rgba(255,255,255,0.9); backdrop-filter: blur(6px); border-radius: 12px; }
+input, button { font-family: inherit }
