@@ -49,32 +49,101 @@ const SCIENTIFIC_ERROR_TYPES = {
   omision_valores_prohibidos: { name: "Omisión de valores prohibidos (Dominio)", cat: "Dominio y Restricciones" }
 };
 
-// Generador del banco masivo de 1,000 reactivos algebraicos
+// Generador masivo enfocado exclusivamente en traducción de lenguaje verbal a algebraico con las 4 directrices estrictas
 const generateMassiveExercises = () => {
   let list = [];
   const vars = ['x', 'y', 'a', 'b', 'm', 'n', 'p', 'q'];
-  const templates = [
-    { text: (v, n) => `El doble de la suma de ${v} y ${n}`, ans: (v, n) => `2*(${v}+${n})`, level: 'Básico', diff: 1, err: 'representacion_lineal_exp' },
-    { text: (v, n) => `El cubo de la diferencia entre ${v} y ${n}`, ans: (v, n) => `(${v}-${n})^3`, level: 'Avanzado', diff: 3, err: 'representacion_lineal_exp' },
-    { text: (v, n) => `La raíz cuadrada de la suma de ${v} y ${n}`, ans: (v, n) => `sqrt(${v}+${n})`, level: 'Intermedio', diff: 2, err: 'falsa_distribucion_radicales' },
-    { text: (v, n) => `El número ${v} restado a ${n}`, ans: (v, n) => `${n}-${v}`, level: 'Básico', diff: 1, err: 'inversion_orden' },
-    { text: (v, n) => `El exceso de ${v} sobre ${n}`, ans: (v, n) => `${v}-${n}`, level: 'Intermedio', diff: 2, err: 'confusion_aditivo_mult' },
-    { text: (v, n) => `El cuadrado de la suma entre ${v} y ${n}`, ans: (v, n) => `(${v}+${n})^2`, level: 'Intermedio', diff: 2, err: 'falsa_distribucion_potencias' },
-    { text: (v, n) => `Resolver la ecuación ${v} - ${n} = 5`, ans: (v, n) => `${5}+${n}`, level: 'Básico', diff: 1, err: 'inversion_incorrecta_operaciones' },
-    { text: (v, n) => `Simplificar la fracción (${v}^2 - ${n}^2) / (${v} - ${n})`, ans: (v, n) => `${v}+${n}`, level: 'Avanzado', diff: 3, err: 'cancelacion_indebida' }
+  
+  // Categorización de contextos variados solicitados
+  const contexts = [
+    "finanzas cotidianas", "geometría", "física elemental", 
+    "situaciones de la vida real", "videojuegos", "compras"
   ];
 
   for (let i = 1; i <= 1000; i++) {
     const v = vars[i % vars.length];
     const n = (i * 7) % 25 + 1;
-    const t = templates[i % templates.length];
+    const contextType = contexts[i % contexts.length];
+    const formatType = i % 4; // 0: Traducción directa, 1: Identificación de error, 2: Completar espacios, 3: Diseño inverso
+    const levelIndex = (i % 3);
+    
+    let level = "Básico";
+    let diff = 1;
+    let statement = "";
+    let answer = "";
+    let errKey = "inversion_orden";
+
+    if (levelIndex === 0) {
+      level = "Básico";
+      diff = 1;
+      if (formatType === 0) {
+        statement = `[Traducción directa - ${contextType}] Escribe la expresión algebraica para: El doble de ${v} disminuido en ${n}.`;
+        answer = `2*${v}-${n}`;
+        errKey = "confusion_aditivo_mult";
+      } else if (formatType === 1) {
+        statement = `[Identificación de error - ${contextType}] En un problema de ${contextType}, un estudiante tradujo 'el triple de un número aumentado en ${n}' como: ${n} + 3*${v}. Identifica por qué el orden y la estructura presentan una inversión o fallo conceptual.`;
+        answer = `3*${v}+${n}`;
+        errKey = "inversion_orden";
+      } else if (formatType === 2) {
+        statement = `[Completar espacios - ${contextType}] Para representar la mitad de ${v} más ${n}, completa la expresión faltante: ( ___ / 2 ) + ${n}.`;
+        answer = `${v}`;
+        errKey = "whole_part";
+      } else {
+        statement = `[Diseño inverso - ${contextType}] Dada la expresión algebraica 4*${v} + ${n}, redacta un enunciado verbal original en el dominio de ${contextType} que la represente correctamente.`;
+        answer = `4*${v}+${n}`;
+        errKey = "relacional_vs_operativo";
+      }
+    } else if (levelIndex === 1) {
+      level = "Intermedio";
+      diff = 2;
+      const v2 = vars[(i + 1) % vars.length];
+      if (formatType === 0) {
+        statement = `[Traducción directa - ${contextType}] Escribe la expresión algebraica para: La suma de los cuadrados de dos números impares consecutivos ${v} y ${v2}.`;
+        answer = `${v}^2+${v2}^2`;
+        errKey = "falsa_distribucion_potencias";
+      } else if (formatType === 1) {
+        statement = `[Identificación de error - ${contextType}] Un alumno tradujo 'el 25% de la diferencia entre ${v} y ${n}' como: 0.25*${v} - ${n}. Explica el error conceptual en la agrupación y la resta.`;
+        answer = `0.25*(${v}-${n})`;
+        errKey = "ruptura_agrupacion";
+      } else if (formatType === 2) {
+        statement = `[Completar espacios - ${contextType}] Para indicar la edad de una persona que dentro de ${n} años tendrá el doble de la edad actual ${v}, completa: 2*(${v} + ___).`;
+        answer = `${n}`;
+        errKey = "alteracion_precedencia";
+      } else {
+        statement = `[Diseño inverso - ${contextType}] Dada la expresión 3*(${v} + ${v2}), redacta un problema verbal coherente con el contexto de ${contextType}.`;
+        answer = `3*(${v}+${v2})`;
+        errKey = "ruptura_agrupacion";
+      }
+    } else {
+      level = "Avanzado";
+      diff = 3;
+      const v2 = vars[(i + 2) % vars.length];
+      if (formatType === 0) {
+        statement = `[Traducción directa - ${contextType}] Escribe la ecuación algebraica completa (sin resolverla) para: El cociente entre la suma de ${v} y ${n} y la diferencia de ${v2} y 4 es igual a 10, con ${v2} diferente de 4.`;
+        answer = `(${v}+${n})/(${v2}-4)=10`;
+        errKey = "cancelacion_indebida";
+      } else if (formatType === 1) {
+        statement = `[Identificación de error - ${contextType}] Ante el enunciado 'la raíz cuadrada de la suma de ${v} y ${n} dividida por su producto', se planteó: sqrt(${v}+${n}) / ${v}*${n}. Analiza la falsa distribución y la prioridad de operaciones.`;
+        answer = `sqrt(${v}+${n})/(${v}*${n})`;
+        errKey = "falsa_distribucion_radicales";
+      } else if (formatType === 2) {
+        statement = `[Completar espacios - ${contextType}] En el planteamiento de un problema complejo de ${contextType} donde intervienen fracciones compuestas, completa la restricción del denominador: ${v} / (___ - 5) = 8.`;
+        answer = `${v}`;
+        errKey = "omision_valores_prohibidos";
+      } else {
+        statement = `[Diseño inverso - ${contextType}] Dada la ecuación (${v}^2 - ${n}) / (${v} + 2) = 15, redacta un enunciado verbal avanzado que involucre restricciones lógicas en el dominio de ${contextType}.`;
+        answer = `(${v}^2-${n})/(${v}+2)=15`;
+        errKey = "omision_valores_prohibidos";
+      }
+    }
+
     list.push({
-      id: `ALG-${400 + i}`,
-      level: t.level,
-      difficulty: t.diff,
-      statement: `${t.text(v, n)}`,
-      answer: t.ans(v, n),
-      defaultError: t.err
+      id: `ALG-${8000 + i}`,
+      level: level,
+      difficulty: diff,
+      statement: statement,
+      answer: answer,
+      defaultError: errKey
     });
   }
   return list;
@@ -106,7 +175,6 @@ function App() {
   const [selectedLevel, setSelectedLevel] = useState("Todos");
   const [progressMap, setProgressMap] = useState({ "Todos": 0, "Básico": 0, "Intermedio": 0, "Avanzado": 0 });
   
-  // Variables Independientes (Metadatos de la muestra con validación estricta)
   const [studentHash, setStudentHash] = useState("");
   const [educationType, setEducationType] = useState("Secundaria");
   const [gradeLevel, setGradeLevel] = useState("1° grado");
@@ -124,12 +192,13 @@ function App() {
   const [pinInput, setPinInput] = useState("");
   const [isTeacherAuth, setIsTeacherAuth] = useState(false);
 
-  // Analíticas y estadísticas avanzadas almacenadas persistentemente en localStorage
   const [analytics, setAnalytics] = useState(() => {
-    const saved = localStorage.getItem("siti_algebra_analytics_v2");
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
-    }
+    try {
+      const savedLocal = localStorage.getItem("siti_algebra_analytics_v3");
+      if (savedLocal) return JSON.parse(savedLocal);
+      const savedSession = sessionStorage.getItem("siti_algebra_analytics_v3");
+      if (savedSession) return JSON.parse(savedSession);
+    } catch(e) {}
     return {
       totalAttempts: 0,
       correctAttempts: 0,
@@ -140,7 +209,13 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem("siti_algebra_analytics_v2", JSON.stringify(analytics));
+    const dataString = JSON.stringify(analytics);
+    try {
+      localStorage.setItem("siti_algebra_analytics_v3", dataString);
+      sessionStorage.setItem("siti_algebra_analytics_v3", dataString);
+    } catch (e) {
+      console.warn("Fallo de almacenamiento local en dispositivo móvil.", e);
+    }
   }, [analytics]);
 
   const filteredExs = selectedLevel === "Todos" ? exercises : exercises.filter(ex => ex.level === selectedLevel);
@@ -152,7 +227,6 @@ function App() {
     setAttemptNumber(1);
   }, [currentEx, selectedLevel]);
 
-  // Actualizar grados por defecto al cambiar el tipo de nivel educativo
   const handleEducationTypeChange = (type) => {
     setEducationType(type);
     if (type === "Secundaria") {
@@ -162,7 +236,6 @@ function App() {
     }
   };
 
-  // Validación estricta en el inicio de sesión
   const handleLogin = (e) => {
     e.preventDefault();
     if (!studentHash.trim()) {
@@ -185,9 +258,8 @@ function App() {
     }
   };
 
-  // Función exclusiva para que el docente borre los registros cuando lo considere necesario
   const clearTeacherLogs = () => {
-    if (confirm("¿Estás seguro de borrar todos los registros analíticos almacenados? Esta acción reiniciará las métricas de investigación.")) {
+    if (confirm("¿Estás seguro de borrar todos los registros analíticos almacenados?")) {
       const resetState = {
         totalAttempts: 0,
         correctAttempts: 0,
@@ -196,15 +268,17 @@ function App() {
         logs: []
       };
       setAnalytics(resetState);
-      localStorage.removeItem("siti_algebra_analytics_v2");
+      try {
+        localStorage.removeItem("siti_algebra_analytics_v3");
+        sessionStorage.removeItem("siti_algebra_analytics_v3");
+      } catch(e) {}
     }
   };
 
   const insertSymbol = (sym) => setInputExpr(prev => prev + sym);
 
-  // Motor Socrático y Procesamiento de Respuesta con Simulación de Contexto IA
   const evaluateAnswer = () => {
-    if (!inputExpr.trim()) return alert("Ingresa una expresión algebraica antes de evaluar.");
+    if (!inputExpr.trim()) return alert("Ingresa una respuesta antes de evaluar.");
     const responseTimeMs = Date.now() - startTime;
     const cleanIn = inputExpr.replace(/\s/g, "").toLowerCase();
     const cleanAns = currentEx.answer.replace(/\s/g, "").toLowerCase();
@@ -272,12 +346,11 @@ function App() {
       }));
       setFeedback({
         correct: true,
-        msg: "🌟 ¡Excelente! Validación socrática superada con éxito. Pasemos al siguiente reactivo."
+        msg: "🌟 ¡Excelente traducción algebraica superada con éxito!"
       });
       return;
     }
 
-    // Incremento de intentos para andamiaje socrático progresivo (Niveles 1, 2 y 3)
     const nextAttempt = attemptNumber + 1;
     setAttemptNumber(nextAttempt);
     const errorObj = SCIENTIFIC_ERROR_TYPES[diagnosedErrorKey];
@@ -286,17 +359,17 @@ function App() {
     if (nextAttempt === 2) {
       socrativeSteps = [
         "💬 Paso 1 (Validación empática):",
-        `¡Cerca! Has aplicado el enfoque en "${errorObj.cat}", pero revisemos la estructura de la operación original.`
+        `¡Cerca! Has considerado el concepto de "${errorObj.cat}", pero revisemos la dirección de la traducción verbal.`
       ];
     } else if (nextAttempt === 3) {
       socrativeSteps = [
         "🔍 Paso 2 (Pregunta orientadora):",
-        `Cuando tienes una expresión como "${currentEx.statement}", ¿qué operación representa matemáticamente la agrupación o el orden de los componentes?`
+        `Al pasar del lenguaje verbal al algebraico en este enunciado, ¿qué operación o signo conecta correctamente las partes involucradas?`
       ];
     } else {
       socrativeSteps = [
         "🛠️ Paso 3 (Andamiaje progresivo detallado):",
-        `Persiste el patrón en "${errorObj.name}" (EPI: ${previousConsecutive}). Recuerda verificar la regla fundamental y expresar la operación respetando el orden correcto.`
+        `Revisa el patrón de "${errorObj.name}" (EPI: ${previousConsecutive}). Asegúrate de respetar la precedencia y la estructura solicitada.`
       ];
     }
 
@@ -312,21 +385,20 @@ function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `dataset_siti_investigacion_${Date.now()}.csv`;
+    a.download = `dataset_siti_traduccion_${Date.now()}.csv`;
     a.click();
   };
 
   const totalErrors = Object.values(analytics.errorCounts).reduce((a, b) => a + b, 0);
   const criticalThreshold = analytics.totalAttempts > 0 ? (totalErrors / analytics.totalAttempts > 0.4) : false;
 
-  // Pantalla de Inicio Obligatoria (Control de Acceso Estricto)
   if (!isLoggedIn) {
     return (
       <div className="h-full w-full flex items-center justify-center p-4 bg-[#F8F9FA]">
         <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-xl max-w-md w-full space-y-6 text-center">
-          <div className="inline-block bg-sky-100 text-sky-700 text-xs font-bold px-3 py-1 rounded-full border border-sky-200">SITI - Sistema Tutor Inteligente de Álgebra</div>
+          <div className="inline-block bg-sky-100 text-sky-700 text-xs font-bold px-3 py-1 rounded-full border border-sky-200">SITI - Tutor de Traducción Algebraica</div>
           <h1 className="text-xl md:text-2xl font-black text-[#212529]">Credenciales de Acceso e Investigación</h1>
-          <p className="text-xs text-slate-500">Es obligatorio completar todos los campos para ingresar al entorno socrático.</p>
+          <p className="text-xs text-slate-500">Es obligatorio completar todos los campos para ingresar al entorno de traducción.</p>
           <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
               <label className="text-xs font-bold text-[#212529] block mb-1">ID Anónimo de Estudiante (Hash) *:</label>
@@ -403,7 +475,7 @@ function App() {
               />
             </div>
             <button type="submit" className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-3.5 rounded-xl text-base transition-all shadow-md shadow-sky-600/20">
-              Iniciar Tutoría Inteligente 🚀
+              Iniciar Traducción Inteligente 🚀
             </button>
           </form>
         </div>
@@ -413,7 +485,6 @@ function App() {
 
   return (
     <div className="h-full w-full p-2 md:p-4 flex flex-col max-w-7xl mx-auto overflow-hidden gap-3 bg-[#F8F9FA]">
-      {/* Header adaptable sin pantallas oscuras */}
       <header className="bg-white border border-slate-200 p-3.5 rounded-xl shadow-sm flex justify-between items-center flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center font-black text-base shadow">
@@ -421,7 +492,7 @@ function App() {
           </div>
           <div>
             <h1 className="text-sm font-black text-[#212529]">Muestra ID: <span className="text-sky-600">{studentHash}</span> ({educationType} - {gradeLevel})</h1>
-            <p className="text-xs text-slate-500">Condición: <span className="font-bold text-[#212529]">{experimentalCondition}</span></p>
+            <p className="text-xs text-slate-500">Enfoque: <span className="font-bold text-[#212529]">Traducción de Lenguaje Verbal a Algebraico</span></p>
           </div>
         </div>
         <div>
@@ -437,12 +508,11 @@ function App() {
         </div>
       </header>
 
-      {/* Modal PIN Docente Seguro */}
       {showPinModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-2xl max-w-sm w-full space-y-4">
             <h3 className="text-base font-black text-[#212529]">Acceso Restringido al Panel Docente</h3>
-            <p className="text-xs text-slate-600">Ingresa el PIN de seguridad (La clave permanece oculta).</p>
+            <p className="text-xs text-slate-600">Ingresa el PIN de seguridad.</p>
             <form onSubmit={handleTeacherLogin} className="space-y-3">
               <input 
                 type="password" 
@@ -462,14 +532,13 @@ function App() {
         </div>
       )}
 
-      {/* Panel del Profesor y Analíticas con Tipografía Grande y Opción de Borrado */}
       {activeTab === 'teacher' && isTeacherAuth && (
         <div className="flex-1 overflow-y-auto space-y-4 pr-1 custom-scrollbar">
           <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm space-y-5">
             <div className="border-b border-slate-200 pb-4 flex justify-between items-center flex-wrap gap-3">
               <div>
-                <h2 className="text-lg md:text-xl font-black text-sky-700">Panel Docente Científico - Analíticas SITI</h2>
-                <p className="text-sm md:text-base text-slate-600">Métricas avanzadas, trazabilidad socrática y exportación para investigación estadística.</p>
+                <h2 className="text-lg md:text-xl font-black text-sky-700">Panel Docente Científico - SITI Traducción</h2>
+                <p className="text-sm md:text-base text-slate-600">Métricas avanzadas sincronizadas desde dispositivos móviles y PC.</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={exportCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm md:text-base font-bold px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-1.5">
@@ -483,11 +552,10 @@ function App() {
 
             {criticalThreshold && (
               <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm font-bold p-3.5 rounded-xl animate-pulse">
-                ⚠️ ALERTA CRÍTICA: La tasa de errores supera el umbral del 40% en clase. Se sugiere intervención pedagógica grupal.
+                ⚠️ ALERTA CRÍTICA: La tasa de errores supera el umbral del 40%. Se requiere refuerzo en traducción verbal.
               </div>
             )}
 
-            {/* Tarjetas de Métricas Globales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-[#F8F9FA] border border-slate-200 p-4.5 rounded-xl shadow-sm">
                 <span className="text-sm text-slate-600 font-bold block mb-1">Intentos Totales</span>
@@ -509,9 +577,8 @@ function App() {
               </div>
             </div>
 
-            {/* Gráficos Estadísticos de Error */}
             <div className="bg-[#F8F9FA] border border-slate-200 p-5 rounded-xl space-y-3 shadow-sm">
-              <h3 className="text-base md:text-lg font-bold text-[#212529]">Gráfico Estadístico: Frecuencia por Taxonomía de Error Científico</h3>
+              <h3 className="text-base md:text-lg font-bold text-[#212529]">Gráfico Estadístico: Frecuencia por Taxonomía de Error en Traducción</h3>
               <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-2">
                 {Object.entries(SCIENTIFIC_ERROR_TYPES).map(([key, info]) => {
                   const count = analytics.errorCounts[key] || 0;
@@ -531,9 +598,8 @@ function App() {
               </div>
             </div>
 
-            {/* Matriz y Auditoría Forense detallada */}
             <div className="space-y-2">
-              <h3 className="text-base md:text-lg font-bold text-[#212529]">Auditoría Forense y Variables Dependientes (Matriz Estadística)</h3>
+              <h3 className="text-base md:text-lg font-bold text-[#212529]">Auditoría Forense (Matriz Estadística)</h3>
               <div className="bg-[#F8F9FA] rounded-xl border border-slate-200 overflow-hidden max-h-52 overflow-y-auto custom-scrollbar shadow-sm">
                 {analytics.logs.length === 0 ? (
                   <p className="p-6 text-base text-slate-500 text-center">Sin registros de actividad en la sesión actual.</p>
@@ -577,22 +643,21 @@ function App() {
         </div>
       )}
 
-      {/* Vista del Estudiante - Tutor Socrático Inteligente */}
       {activeTab === 'student' && (
         <div className="flex-1 bg-white border border-slate-200 p-4 md:p-6 rounded-xl shadow-sm flex flex-col justify-between overflow-hidden">
           <div className="space-y-4 overflow-y-auto pr-1 custom-scrollbar">
             <div className="flex justify-between items-center flex-wrap gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm md:text-base font-bold text-[#212529]">Banco Masivo de Reactivos:</span>
+                <span className="text-sm md:text-base font-bold text-[#212529]">Banco Exclusivo de Traducción:</span>
                 <select 
                   value={selectedLevel} 
                   onChange={e => { setSelectedLevel(e.target.value); setFeedback(null); setInputExpr(""); setAttemptNumber(1); }} 
                   className="bg-[#F8F9FA] border border-slate-300 p-2.5 rounded-lg text-sm md:text-base font-bold outline-none text-sky-700 shadow-sm"
                 >
                   <option value="Todos">Todos (1,000 Reactivos)</option>
-                  <option value="Básico">Básico (Nivel 1)</option>
-                  <option value="Intermedio">Intermedio (Nivel 2)</option>
-                  <option value="Avanzado">Avanzado (Nivel 3)</option>
+                  <option value="Básico">Nivel 1 (Básico)</option>
+                  <option value="Intermedio">Nivel 2 (Intermedio)</option>
+                  <option value="Avanzado">Nivel 3 (Avanzado)</option>
                 </select>
               </div>
               <div className="flex items-center gap-3">
@@ -606,7 +671,6 @@ function App() {
               </div>
             </div>
 
-            {/* Enunciado del Reactivo Algebraico */}
             <div className="bg-[#F8F9FA] border border-slate-200 p-5 rounded-xl shadow-sm">
               <div className="flex justify-between mb-2">
                 <span className="text-xs md:text-sm font-bold bg-sky-100 text-sky-800 px-3 py-1 rounded-full border border-sky-200">Nivel {currentEx.level} (Dificultad: {currentEx.difficulty})</span>
@@ -615,7 +679,6 @@ function App() {
               <h2 className="text-lg md:text-xl font-black text-[#212529]">"{currentEx.statement}"</h2>
             </div>
 
-            {/* Input Algebraico y Teclado Virtual Interactivo */}
             <div className="space-y-3">
               <input 
                 type="text"
@@ -626,23 +689,21 @@ function App() {
                 placeholder="Escribe tu expresión o usa el teclado virtual..."
               />
               <div className="flex flex-wrap gap-2 bg-[#F8F9FA] border border-slate-200 p-3 rounded-xl shadow-sm">
-                {['x', 'y', 'a', 'b', '+', '-', '*', '/', '^3', '(', ')', 'sqrt('].map(sym => (
+                {['x', 'y', 'a', 'b', '+', '-', '*', '/', '^2', '^3', '(', ')', 'sqrt('].map(sym => (
                   <button key={sym} onClick={() => insertSymbol(sym)} className="bg-white hover:bg-slate-100 text-[#212529] font-bold px-4 py-2.5 rounded-lg border border-slate-300 text-sm md:text-base shadow-sm transition-all">{sym}</button>
                 ))}
                 <button onClick={() => setInputExpr("")} className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-4 py-2.5 rounded-lg border border-rose-200 ml-auto text-sm md:text-base">Limpiar</button>
               </div>
 
-              {/* Visualizador KaTeX en Vivo */}
               <div className="bg-[#F8F9FA] border border-slate-200 p-4 rounded-xl text-center shadow-inner">
                 <span className="text-xs text-slate-500 uppercase tracking-widest block mb-1 font-semibold">Visualizador KaTeX en Vivo</span>
                 <MathNode formula={inputExpr} />
               </div>
             </div>
 
-            {/* Retroalimentación Socrática (Scaffolding Progresivo) */}
             {feedback && (
               <div className={`p-4 md:p-5 rounded-xl border space-y-2.5 ${feedback.correct ? "bg-emerald-50 text-emerald-900 border-emerald-200" : "bg-amber-50 text-amber-900 border-amber-200"}`}>
-                <p className="font-bold text-base">{feedback.correct ? feedback.msg : "💡 Orientación Socrática Progresiva (Sin dar la solución directa):"}</p>
+                <p className="font-bold text-base">{feedback.correct ? feedback.msg : "💡 Orientación Socrática Progresiva:"}</p>
                 {!feedback.correct && feedback.steps && (
                   <div className="space-y-2 pt-1 border-t border-amber-200">
                     {feedback.steps.map((step, idx) => (
@@ -661,7 +722,7 @@ function App() {
               onClick={evaluateAnswer} 
               className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-4 rounded-xl shadow-md transition-all text-base md:text-lg"
             >
-              Evaluar y Enviar Respuesta (Presiona Enter)
+              Evaluar y Enviar Traducción (Presiona Enter)
             </button>
           </div>
         </div>
@@ -670,6 +731,7 @@ function App() {
   );
 }
 
+// CORRECCIÓN: Se agregó "document." antes de getElementById
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
