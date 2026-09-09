@@ -1,12 +1,13 @@
-<html lang="es" class="h-full">
+<!DOCTYPE html>
+<html lang="es" class="h-full w-full">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistema Tutor Inteligente de Álgebra (SITI) - Panel Analítico & Socrático</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 <style>
@@ -26,6 +27,9 @@
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
 const TEACHER_PIN = "5678";
+
+// URL o endpoint central configurado para la persistencia en la nube (Backend y Base de Datos)
+const API_URL = "https://tu-backend-en-la-nube.com/api";
 
 // Taxonomía científica estricta de errores algebraicos
 const SCIENTIFIC_ERROR_TYPES = {
@@ -192,31 +196,33 @@ function App() {
   const [pinInput, setPinInput] = useState("");
   const [isTeacherAuth, setIsTeacherAuth] = useState(false);
 
-  const [analytics, setAnalytics] = useState(() => {
-    try {
-      const savedLocal = localStorage.getItem("siti_algebra_analytics_v3");
-      if (savedLocal) return JSON.parse(savedLocal);
-      const savedSession = sessionStorage.getItem("siti_algebra_analytics_v3");
-      if (savedSession) return JSON.parse(savedSession);
-    } catch(e) {}
-    return {
-      totalAttempts: 0,
-      correctAttempts: 0,
-      errorCounts: Object.keys(SCIENTIFIC_ERROR_TYPES).reduce((acc, key) => ({ ...acc, [key]: 0 }), {}),
-      errorStudentTracker: {},
-      logs: []
-    };
+  // Inicialización de analíticas con estructura global lista para el servidor
+  const [analytics, setAnalytics] = useState({
+    totalAttempts: 0,
+    correctAttempts: 0,
+    errorCounts: Object.keys(SCIENTIFIC_ERROR_TYPES).reduce((acc, key) => ({ ...acc, [key]: 0 }), {}),
+    errorStudentTracker: {},
+    logs: []
   });
 
-  useEffect(() => {
-    const dataString = JSON.stringify(analytics);
+  // Consulta Global centralizada en la nube al abrir o actualizar el Panel Docente
+  const fetchGlobalAnalytics = async () => {
     try {
-      localStorage.setItem("siti_algebra_analytics_v3", dataString);
-      sessionStorage.setItem("siti_algebra_analytics_v3", dataString);
+      const response = await fetch(`${API_URL}/analytics`);
+      if (response.ok) {
+        const globalData = await response.json();
+        setAnalytics(globalData);
+      }
     } catch (e) {
-      console.warn("Fallo de almacenamiento local en dispositivo móvil.", e);
+      console.warn("No se pudo conectar con el servidor central, usando datos locales de respaldo.", e);
     }
-  }, [analytics]);
+  };
+
+  useEffect(() => {
+    if (activeTab === 'teacher' && isTeacherAuth) {
+      fetchGlobalAnalytics();
+    }
+  }, [activeTab, isTeacherAuth]);
 
   const filteredExs = selectedLevel === "Todos" ? exercises : exercises.filter(ex => ex.level === selectedLevel);
   const curIndex = progressMap[selectedLevel] || 0;
@@ -245,21 +251,25 @@ function App() {
     setIsLoggedIn(true);
   };
 
-  const handleTeacherLogin = (e) => {
+  const handleTeacherLogin = async (e) => {
     e.preventDefault();
     if (pinInput === TEACHER_PIN) {
       setIsTeacherAuth(true);
       setShowPinModal(false);
       setActiveTab("teacher");
       setPinInput("");
+      await fetchGlobalAnalytics();
     } else {
       alert("PIN incorrecto. Acceso restringido.");
       setPinInput("");
     }
   };
 
-  const clearTeacherLogs = () => {
-    if (confirm("¿Estás seguro de borrar todos los registros analíticos almacenados?")) {
+  const clearTeacherLogs = async () => {
+    if (confirm("¿Estás seguro de borrar todos los registros analíticos almacenados en el servidor?")) {
+      try {
+        await fetch(`${API_URL}/analytics`, { method: 'DELETE' });
+      } catch (e) {}
       const resetState = {
         totalAttempts: 0,
         correctAttempts: 0,
@@ -268,16 +278,12 @@ function App() {
         logs: []
       };
       setAnalytics(resetState);
-      try {
-        localStorage.removeItem("siti_algebra_analytics_v3");
-        sessionStorage.removeItem("siti_algebra_analytics_v3");
-      } catch(e) {}
     }
   };
 
   const insertSymbol = (sym) => setInputExpr(prev => prev + sym);
 
-  const evaluateAnswer = () => {
+  const evaluateAnswer = async () => {
     if (!inputExpr.trim()) return alert("Ingresa una respuesta antes de evaluar.");
     const responseTimeMs = Date.now() - startTime;
     const cleanIn = inputExpr.replace(/\s/g, "").toLowerCase();
@@ -293,6 +299,39 @@ function App() {
     const trackerKey = `${studentHash}_${diagnosedErrorKey}`;
     const previousConsecutive = (analytics.errorStudentTracker?.[trackerKey] || 0) + (isCorrect ? 0 : 1);
 
+    const timestampUtc = new Date().toISOString();
+    const fullGradeDesc = `${educationType} (${gradeLevel})`;
+    const newLog = {
+      timestamp_utc: timestampUtc,
+      student_hash: studentHash,
+      grade_level: fullGradeDesc,
+      experimental_condition: experimentalCondition,
+      pre_test_score: preTestScore,
+      exercise_id: currentEx.id,
+      exercise_statement: currentEx.statement,
+      input_expression: inputExpr,
+      difficulty_level: currentEx.difficulty,
+      attempt_number: attemptNumber,
+      error_taxonomy: isCorrect ? "N/A" : diagnosedErrorKey,
+      error_name: isCorrect ? "N/A" : SCIENTIFIC_ERROR_TYPES[diagnosedErrorKey].name,
+      error_cat: isCorrect ? "N/A" : SCIENTIFIC_ERROR_TYPES[diagnosedErrorKey].cat,
+      scaffolding_step: isCorrect ? 0 : Math.min(attemptNumber, 3),
+      response_time_ms: responseTimeMs,
+      success_binary: isCorrect ? 1 : 0,
+      epi_index: previousConsecutive
+    };
+
+    // Envío automático de las métricas mediante petición HTTP (POST) al backend centralizado
+    try {
+      await fetch(`${API_URL}/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newLog)
+      });
+    } catch (e) {
+      console.warn("No se pudo enviar el registro al servidor.", e);
+    }
+
     setAnalytics(prev => {
       const newTotal = prev.totalAttempts + 1;
       const newCorrect = prev.correctAttempts + (isCorrect ? 1 : 0);
@@ -307,28 +346,6 @@ function App() {
       } else {
         newTracker[trackerKey] = previousConsecutive;
       }
-
-      const timestampUtc = new Date().toISOString();
-      const fullGradeDesc = `${educationType} (${gradeLevel})`;
-      const newLog = {
-        timestamp_utc: timestampUtc,
-        student_hash: studentHash,
-        grade_level: fullGradeDesc,
-        experimental_condition: experimentalCondition,
-        pre_test_score: preTestScore,
-        exercise_id: currentEx.id,
-        exercise_statement: currentEx.statement,
-        input_expression: inputExpr,
-        difficulty_level: currentEx.difficulty,
-        attempt_number: attemptNumber,
-        error_taxonomy: isCorrect ? "N/A" : diagnosedErrorKey,
-        error_name: isCorrect ? "N/A" : SCIENTIFIC_ERROR_TYPES[diagnosedErrorKey].name,
-        error_cat: isCorrect ? "N/A" : SCIENTIFIC_ERROR_TYPES[diagnosedErrorKey].cat,
-        scaffolding_step: isCorrect ? 0 : Math.min(attemptNumber, 3),
-        response_time_ms: responseTimeMs,
-        success_binary: isCorrect ? 1 : 0,
-        epi_index: previousConsecutive
-      };
 
       return {
         totalAttempts: newTotal,
@@ -538,7 +555,7 @@ function App() {
             <div className="border-b border-slate-200 pb-4 flex justify-between items-center flex-wrap gap-3">
               <div>
                 <h2 className="text-lg md:text-xl font-black text-sky-700">Panel Docente Científico - SITI Traducción</h2>
-                <p className="text-sm md:text-base text-slate-600">Métricas avanzadas sincronizadas desde dispositivos móviles y PC.</p>
+                <p className="text-sm md:text-base text-slate-600">Métricas avanzadas sincronizadas globalmente desde la nube.</p>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <button onClick={exportCSV} className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm md:text-base font-bold px-4 py-2.5 rounded-xl shadow transition-all flex items-center gap-1.5">
@@ -599,10 +616,10 @@ function App() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-base md:text-lg font-bold text-[#212529]">Auditoría Forense (Matriz Estadística)</h3>
+              <h3 className="text-base md:text-lg font-bold text-[#212529]">Auditoría Forense (Matriz Estadística Global)</h3>
               <div className="bg-[#F8F9FA] rounded-xl border border-slate-200 overflow-hidden max-h-52 overflow-y-auto custom-scrollbar shadow-sm">
                 {analytics.logs.length === 0 ? (
-                  <p className="p-6 text-base text-slate-500 text-center">Sin registros de actividad en la sesión actual.</p>
+                  <p className="p-6 text-base text-slate-500 text-center">Sin registros de actividad almacenados en el servidor.</p>
                 ) : (
                   <table className="w-full text-left text-sm md:text-base">
                     <thead className="bg-slate-100 text-[#212529] font-bold sticky top-0 border-b border-slate-200">
@@ -731,7 +748,6 @@ function App() {
   );
 }
 
-// CORRECCIÓN: Se agregó "document." antes de getElementById
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
